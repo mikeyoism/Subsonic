@@ -165,7 +165,7 @@ public class DLNAController extends RemoteController {
 				try {
 
 					String lastChangeText = m.get("LastChange").toString();
-					lastChangeText = lastChangeText.replace(",X_DLNA_SeekTime","");
+					lastChangeText = lastChangeText.replace(",X_DLNA_SeekTime","").replace(",X_DLNA_SeekByte", "");
 					LastChange lastChange = new LastChange(new AVTransportLastChangeParser(), lastChangeText);
 					if (lastChange.getEventedValue(0, AVTransportVariable.TransportState.class) == null) {
 						return;

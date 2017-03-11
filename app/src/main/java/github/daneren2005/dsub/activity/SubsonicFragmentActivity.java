@@ -28,8 +28,8 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.TypedArray;
 import android.os.Bundle;
-import android.os.Handler;
 import android.preference.PreferenceManager;
+import android.provider.MediaStore;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v7.app.AlertDialog;
@@ -37,8 +37,6 @@ import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.CheckBox;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -48,9 +46,6 @@ import com.sothree.slidinguppanel.SlidingUpPanelLayout;
 import java.io.File;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 import github.daneren2005.dsub.R;
 import github.daneren2005.dsub.domain.MusicDirectory;
@@ -66,6 +61,7 @@ import github.daneren2005.dsub.fragments.SearchFragment;
 import github.daneren2005.dsub.fragments.SelectArtistFragment;
 import github.daneren2005.dsub.fragments.SelectBookmarkFragment;
 import github.daneren2005.dsub.fragments.SelectDirectoryFragment;
+import github.daneren2005.dsub.fragments.SelectInternetRadioStationFragment;
 import github.daneren2005.dsub.fragments.SelectPlaylistFragment;
 import github.daneren2005.dsub.fragments.SelectPodcastsFragment;
 import github.daneren2005.dsub.fragments.SelectShareFragment;
@@ -76,6 +72,7 @@ import github.daneren2005.dsub.service.MusicService;
 import github.daneren2005.dsub.service.MusicServiceFactory;
 import github.daneren2005.dsub.updates.Updater;
 import github.daneren2005.dsub.util.Constants;
+import github.daneren2005.dsub.util.DrawableTint;
 import github.daneren2005.dsub.util.FileUtil;
 import github.daneren2005.dsub.util.SilentBackgroundTask;
 import github.daneren2005.dsub.util.UserUtil;
@@ -107,6 +104,10 @@ public class SubsonicFragmentActivity extends SubsonicActivity implements Downlo
 	private long lastBackPressTime = 0;
 	private DownloadFile currentPlaying;
 	private PlayerState currentState;
+	private ImageButton previousButton;
+	private ImageButton nextButton;
+	private ImageButton rewindButton;
+	private ImageButton fastforwardButton;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -133,6 +134,7 @@ public class SubsonicFragmentActivity extends SubsonicActivity implements Downlo
 			stopService(new Intent(this, DownloadService.class));
 			finish();
 			getImageLoader().clearCache();
+			DrawableTint.clearCache();
 		} else if(getIntent().hasExtra(Constants.INTENT_EXTRA_NAME_DOWNLOAD_VIEW)) {
 			getIntent().putExtra(Constants.INTENT_EXTRA_FRAGMENT_TYPE, "Download");
 			lastSelectedPosition = R.id.drawer_downloading;
@@ -154,7 +156,10 @@ public class SubsonicFragmentActivity extends SubsonicActivity implements Downlo
 				if(item != null) {
 					item.setChecked(true);
 				}
+			} else {
+				lastSelectedPosition = getDrawerItemId(fragmentType);
 			}
+
 			currentFragment = getNewFragment(fragmentType);
 			if(getIntent().hasExtra(Constants.INTENT_EXTRA_NAME_ID)) {
 				Bundle currentArguments = currentFragment.getArguments();
@@ -197,11 +202,13 @@ public class SubsonicFragmentActivity extends SubsonicActivity implements Downlo
 			@Override
 			public void onPanelCollapsed(View panel) {
 				isPanelClosing = false;
-				bottomBar.setVisibility(View.VISIBLE);
-				nowPlayingToolbar.setVisibility(View.GONE);
-				nowPlayingFragment.setPrimaryFragment(false);
-				setSupportActionBar(mainToolbar);
-				recreateSpinner();
+				if(bottomBar.getVisibility() == View.GONE) {
+					bottomBar.setVisibility(View.VISIBLE);
+					nowPlayingToolbar.setVisibility(View.GONE);
+					nowPlayingFragment.setPrimaryFragment(false);
+					setSupportActionBar(mainToolbar);
+					recreateSpinner();
+				}
 			}
 
 			@Override
@@ -216,7 +223,12 @@ public class SubsonicFragmentActivity extends SubsonicActivity implements Downlo
 				bottomBar.setVisibility(View.GONE);
 				nowPlayingToolbar.setVisibility(View.VISIBLE);
 				setSupportActionBar(nowPlayingToolbar);
-				nowPlayingFragment.setPrimaryFragment(true);
+
+				if(secondaryFragment == null) {
+					nowPlayingFragment.setPrimaryFragment(true);
+				} else {
+					secondaryFragment.setPrimaryFragment(true);
+				}
 
 				drawerToggle.setDrawerIndicatorEnabled(false);
 				getSupportActionBar().setDisplayHomeAsUpEnabled(true);
@@ -262,7 +274,25 @@ public class SubsonicFragmentActivity extends SubsonicActivity implements Downlo
 			trans.commit();
 		}
 
-		ImageButton previousButton = (ImageButton) findViewById(R.id.download_previous);
+		rewindButton = (ImageButton) findViewById(R.id.download_rewind);
+		rewindButton.setOnClickListener(new View.OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				new SilentBackgroundTask<Void>(SubsonicFragmentActivity.this) {
+					@Override
+					protected Void doInBackground() throws Throwable {
+						if (getDownloadService() == null) {
+							return null;
+						}
+
+						getDownloadService().rewind();
+						return null;
+					}
+				}.execute();
+			}
+		});
+
+		previousButton = (ImageButton) findViewById(R.id.download_previous);
 		previousButton.setOnClickListener(new View.OnClickListener() {
 			@Override
 			public void onClick(View v) {
@@ -290,6 +320,8 @@ public class SubsonicFragmentActivity extends SubsonicActivity implements Downlo
 						PlayerState state = getDownloadService().getPlayerState();
 						if(state == PlayerState.STARTED) {
 							getDownloadService().pause();
+						} else if(state == PlayerState.IDLE) {
+							getDownloadService().play();
 						} else {
 							getDownloadService().start();
 						}
@@ -300,7 +332,7 @@ public class SubsonicFragmentActivity extends SubsonicActivity implements Downlo
 			}
 		});
 
-		ImageButton nextButton = (ImageButton) findViewById(R.id.download_next);
+		nextButton = (ImageButton) findViewById(R.id.download_next);
 		nextButton.setOnClickListener(new View.OnClickListener() {
 			@Override
 			public void onClick(View v) {
@@ -312,6 +344,24 @@ public class SubsonicFragmentActivity extends SubsonicActivity implements Downlo
 						}
 
 						getDownloadService().next();
+						return null;
+					}
+				}.execute();
+			}
+		});
+
+		fastforwardButton = (ImageButton) findViewById(R.id.download_fastforward);
+		fastforwardButton.setOnClickListener(new View.OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				new SilentBackgroundTask<Void>(SubsonicFragmentActivity.this) {
+					@Override
+					protected Void doInBackground() throws Throwable {
+						if (getDownloadService() == null) {
+							return null;
+						}
+
+						getDownloadService().fastForward();
 						return null;
 					}
 				}.execute();
@@ -351,14 +401,12 @@ public class SubsonicFragmentActivity extends SubsonicActivity implements Downlo
 			if(currentFragment instanceof SearchFragment) {
 				String query = intent.getStringExtra(Constants.INTENT_EXTRA_NAME_QUERY);
 				boolean autoplay = intent.getBooleanExtra(Constants.INTENT_EXTRA_NAME_AUTOPLAY, false);
-				boolean requestsearch = intent.getBooleanExtra(Constants.INTENT_EXTRA_REQUEST_SEARCH, false);
+				String artist = intent.getStringExtra(MediaStore.EXTRA_MEDIA_ARTIST);
+				String album = intent.getStringExtra(MediaStore.EXTRA_MEDIA_ALBUM);
+				String title = intent.getStringExtra(MediaStore.EXTRA_MEDIA_TITLE);
 
 				if (query != null) {
-					((SearchFragment)currentFragment).search(query, autoplay);
-				} else {
-					if (requestsearch) {
-						onSearchRequested();
-					}
+					((SearchFragment)currentFragment).search(query, autoplay, artist, album, title);
 				}
 				getIntent().removeExtra(Constants.INTENT_EXTRA_NAME_QUERY);
 			} else {
@@ -367,7 +415,14 @@ public class SubsonicFragmentActivity extends SubsonicActivity implements Downlo
 				SearchFragment fragment = new SearchFragment();
 				replaceFragment(fragment, fragment.getSupportTag());
 			}
+		} else if(intent.getBooleanExtra(Constants.INTENT_EXTRA_NAME_DOWNLOAD, false)) {
+			if(slideUpPanel.getPanelState() != SlidingUpPanelLayout.PanelState.EXPANDED) {
+				openNowPlaying();
+			}
 		} else {
+			if(slideUpPanel.getPanelState() == SlidingUpPanelLayout.PanelState.EXPANDED) {
+				closeNowPlaying();
+			}
 			setIntent(intent);
 		}
 		if(drawer != null) {
@@ -420,6 +475,9 @@ public class SubsonicFragmentActivity extends SubsonicActivity implements Downlo
 	public void onSaveInstanceState(Bundle savedInstanceState) {
 		super.onSaveInstanceState(savedInstanceState);
 		savedInstanceState.putString(Constants.MAIN_NOW_PLAYING, nowPlayingFragment.getTag());
+		if(secondaryFragment != null) {
+			savedInstanceState.putString(Constants.MAIN_NOW_PLAYING_SECONDARY, secondaryFragment.getTag());
+		}
 		savedInstanceState.putInt(Constants.MAIN_SLIDE_PANEL_STATE, slideUpPanel.getPanelState().hashCode());
 	}
 	@Override
@@ -429,6 +487,19 @@ public class SubsonicFragmentActivity extends SubsonicActivity implements Downlo
 		String id = savedInstanceState.getString(Constants.MAIN_NOW_PLAYING);
 		FragmentManager fm = getSupportFragmentManager();
 		nowPlayingFragment = (NowPlayingFragment) fm.findFragmentByTag(id);
+
+		String secondaryId = savedInstanceState.getString(Constants.MAIN_NOW_PLAYING_SECONDARY);
+		if(secondaryId != null) {
+			secondaryFragment = (SubsonicFragment) fm.findFragmentByTag(secondaryId);
+
+			nowPlayingFragment.setPrimaryFragment(false);
+			secondaryFragment.setPrimaryFragment(true);
+
+			FragmentTransaction trans = getSupportFragmentManager().beginTransaction();
+			trans.hide(nowPlayingFragment);
+			trans.commit();
+		}
+
 		if(drawerToggle != null && backStack.size() > 0) {
 			drawerToggle.setDrawerIndicatorEnabled(false);
 		}
@@ -594,6 +665,8 @@ public class SubsonicFragmentActivity extends SubsonicActivity implements Downlo
 			return new SelectPodcastsFragment();
 		} else if("Bookmark".equals(fragmentType)) {
 			return new SelectBookmarkFragment();
+		} else if("Internet Radio".equals(fragmentType)) {
+			return new SelectInternetRadioStationFragment();
 		} else if("Share".equals(fragmentType)) {
 			return new SelectShareFragment();
 		} else if("Admin".equals(fragmentType)) {
@@ -854,7 +927,13 @@ public class SubsonicFragmentActivity extends SubsonicActivity implements Downlo
 		if (currentPlaying != null) {
 			song = currentPlaying.getSong();
 			trackView.setText(song.getTitle());
-			artistView.setText(song.getArtist());
+
+			if(song.getArtist() != null) {
+				artistView.setVisibility(View.VISIBLE);
+				artistView.setText(song.getArtist());
+			} else {
+				artistView.setVisibility(View.GONE);
+			}
 		} else {
 			trackView.setText(R.string.main_title);
 			artistView.setText(R.string.main_artist);
@@ -869,6 +948,27 @@ public class SubsonicFragmentActivity extends SubsonicActivity implements Downlo
 				typedArray.recycle();
 			}
 			getImageLoader().loadImage(coverArtView, song, false, height, false);
+		}
+
+		if(getDownloadService().isCurrentPlayingSingle()) {
+			previousButton.setVisibility(View.GONE);
+			nextButton.setVisibility(View.GONE);
+			rewindButton.setVisibility(View.GONE);
+			fastforwardButton.setVisibility(View.GONE);
+		} else {
+			if (currentPlaying != null && currentPlaying.getSong() != null && (currentPlaying.getSong().isPodcast() || currentPlaying.getSong().isAudioBook())) {
+				previousButton.setVisibility(View.GONE);
+				nextButton.setVisibility(View.GONE);
+
+				rewindButton.setVisibility(View.VISIBLE);
+				fastforwardButton.setVisibility(View.VISIBLE);
+			} else {
+				previousButton.setVisibility(View.VISIBLE);
+				nextButton.setVisibility(View.VISIBLE);
+
+				rewindButton.setVisibility(View.GONE);
+				fastforwardButton.setVisibility(View.GONE);
+			}
 		}
 	}
 

@@ -190,27 +190,7 @@ public class SelectDirectoryFragment extends SubsonicFragment implements Section
 		recyclerView.setHasFixedSize(true);
 		fastScroller = (FastScroller) rootView.findViewById(R.id.fragment_fast_scroller);
 		setupScrollList(recyclerView);
-
-		if(largeAlbums) {
-			GridLayoutManager gridLayoutManager = new GridLayoutManager(context, getRecyclerColumnCount());
-			gridLayoutManager.setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
-				@Override
-				public int getSpanSize(int position) {
-					int viewType = entryGridAdapter.getItemViewType(position);
-					if(viewType == EntryGridAdapter.VIEW_TYPE_SONG || viewType == EntryGridAdapter.VIEW_TYPE_HEADER || viewType == EntryInfiniteGridAdapter.VIEW_TYPE_LOADING) {
-						return getRecyclerColumnCount();
-					} else {
-						return 1;
-					}
-				}
-			});
-			recyclerView.addItemDecoration(new GridSpacingDecoration());
-			recyclerView.setLayoutManager(gridLayoutManager);
-		} else {
-			LinearLayoutManager layoutManager = new LinearLayoutManager(context);
-			layoutManager.setOrientation(LinearLayoutManager.VERTICAL);
-			recyclerView.setLayoutManager(layoutManager);
-		}
+		setupLayoutManager(recyclerView, largeAlbums);
 
 		if(entries == null) {
 			if(primaryFragment || secondaryFragment) {
@@ -254,7 +234,7 @@ public class SelectDirectoryFragment extends SubsonicFragment implements Section
 			if(!ServerInfo.hasTopSongs(context)) {
 				menu.removeItem(R.id.menu_top_tracks);
 			}
-			if(!ServerInfo.checkServerVersion(context, "1.11") || (id != null && "root".equals(id))) {
+			if(!ServerInfo.checkServerVersion(context, "1.11")) {
 				menu.removeItem(R.id.menu_radio);
 				menu.removeItem(R.id.menu_similar_artists);
 			} else if(!ServerInfo.hasSimilarArtists(context)) {
@@ -332,10 +312,6 @@ public class SelectDirectoryFragment extends SubsonicFragment implements Section
 		if(!entry.isVideo() && !Util.isOffline(context) && (playlistId == null || !playlistOwner) && (podcastId == null  || Util.isOffline(context) && podcastId != null)) {
 			menu.removeItem(R.id.song_menu_remove_playlist);
 		}
-		// Remove show artists if parent is not set and if not on a album list
-		if((albumListType == null || (entry.getParent() == null && entry.getArtistId() == null)) && !Util.isOffline(context)) {
-			menu.removeItem(R.id.album_menu_show_artist);
-		}
 
 		recreateContextMenu(menu);
 	}
@@ -383,29 +359,20 @@ public class SelectDirectoryFragment extends SubsonicFragment implements Section
 				return;
 			}
 
-			playNow(Arrays.asList(entry));
+			onSongPress(Arrays.asList(entry), entry, false);
 		} else {
-			List<Entry> songs = new ArrayList<Entry>();
-
-			if(Util.getPreferences(context).getBoolean(Constants.PREFERENCES_KEY_PLAY_NOW_AFTER, true) && (albumListType == null || "starred".equals(albumListType))) {
-				for(Entry song: entries) {
-					if(!song.isDirectory() && !song.isVideo()) {
-						songs.add(song);
-					}
-				}
-				playNow(songs, entry, 0);
-			} else {
-				songs.add(entry);
-				playNow(songs);
-			}
+			onSongPress(entries, entry, albumListType == null || "starred".equals(albumListType));
 		}
 	}
 
 	@Override
 	protected void refresh(boolean refresh) {
-		if(!"root".equals(id)) {
-			load(refresh);
-		}
+		load(refresh);
+	}
+
+	@Override
+	protected boolean isShowArtistEnabled() {
+		return albumListType != null;
 	}
 
 	private void load(boolean refresh) {
@@ -492,8 +459,12 @@ public class SelectDirectoryFragment extends SubsonicFragment implements Section
 				}
 				List<Entry> songs = new ArrayList<Entry>();
 				getSongsRecursively(root, songs);
-				root.replaceChildren(songs);
-				return root;
+
+				// CachedMusicService is refreshing this data in the background, so will wipe out the songs list from root
+				MusicDirectory clonedRoot = new MusicDirectory(songs);
+				clonedRoot.setId(root.getId());
+				clonedRoot.setName(root.getName());
+				return clonedRoot;
 			}
 
 			private void getSongsRecursively(MusicDirectory parent, List<Entry> songs) throws Exception {
@@ -693,6 +664,21 @@ public class SelectDirectoryFragment extends SubsonicFragment implements Section
 		return entryGridAdapter;
 	}
 
+	@Override
+	public GridLayoutManager.SpanSizeLookup getSpanSizeLookup(final GridLayoutManager gridLayoutManager) {
+		return new GridLayoutManager.SpanSizeLookup() {
+			@Override
+			public int getSpanSize(int position) {
+				int viewType = entryGridAdapter.getItemViewType(position);
+				if(viewType == EntryGridAdapter.VIEW_TYPE_SONG || viewType == EntryGridAdapter.VIEW_TYPE_HEADER || viewType == EntryInfiniteGridAdapter.VIEW_TYPE_LOADING) {
+					return gridLayoutManager.getSpanCount();
+				} else {
+					return 1;
+				}
+			}
+		};
+	}
+
     private void finishLoading() {
 		boolean validData = !entries.isEmpty() || !albums.isEmpty();
 		if(!validData) {
@@ -751,11 +737,14 @@ public class SelectDirectoryFragment extends SubsonicFragment implements Section
 		if(!artist) {
 			entryGridAdapter.setShowArtist(true);
 		}
+		if(topTracks || showAll) {
+			entryGridAdapter.setShowAlbum(true);
+		}
 
 		// Show header if not album list type and not root and not artist
 		// For Subsonic 5.1+ display a header for artists with getArtistInfo data if it exists
 		boolean addedHeader = false;
-		if(albumListType == null && !"root".equals(id) && (!artist || artistInfo != null || artistInfoDelayed != null) && (share == null || entries.size() != albums.size())) {
+		if(albumListType == null && (!artist || artistInfo != null || artistInfoDelayed != null) && (share == null || entries.size() != albums.size())) {
 			View header = createHeader();
 
 			if(header != null) {
@@ -815,7 +804,7 @@ public class SelectDirectoryFragment extends SubsonicFragment implements Section
 		Bundle args = getArguments();
 		boolean playAll = args.getBoolean(Constants.INTENT_EXTRA_NAME_AUTOPLAY, false);
 		if (playAll && !restoredInstance) {
-			playAll(args.getBoolean(Constants.INTENT_EXTRA_NAME_SHUFFLE, false), false);
+			playAll(args.getBoolean(Constants.INTENT_EXTRA_NAME_SHUFFLE, false), false, false);
 		}
 	}
 
@@ -825,20 +814,19 @@ public class SelectDirectoryFragment extends SubsonicFragment implements Section
 		if(!songs.isEmpty()) {
 			download(songs, append, false, !append, playNext, shuffle);
 			entryGridAdapter.clearSelected();
-		}
-		else {
-			playAll(shuffle, append);
+		} else {
+			playAll(shuffle, append, playNext);
 		}
 	}
-	private void playAll(final boolean shuffle, final boolean append) {
+	private void playAll(final boolean shuffle, final boolean append, final boolean playNext) {
 		boolean hasSubFolders = albums != null && !albums.isEmpty();
 
 		if (hasSubFolders && (id != null || share != null || "starred".equals(albumListType))) {
-			downloadRecursively(id, false, append, !append, shuffle, false);
+			downloadRecursively(id, false, append, !append, shuffle, false, playNext);
 		} else if(hasSubFolders && albumListType != null) {
-			downloadRecursively(albums, shuffle, append);
+			downloadRecursively(albums, shuffle, append, playNext);
 		} else {
-			download(entries, append, false, !append, false, shuffle);
+			download(entries, append, false, !append, playNext, shuffle);
 		}
 	}
 
@@ -932,7 +920,7 @@ public class SelectDirectoryFragment extends SubsonicFragment implements Section
 				for(Integer index: indexes) {
 					entryGridAdapter.removeAt(index);
 				}
-				Util.toast(context, context.getResources().getString(R.string.removed_playlist, indexes.size(), name));
+				Util.toast(context, context.getResources().getString(R.string.removed_playlist, String.valueOf(indexes.size()), name));
 			}
 
 			@Override
@@ -1086,11 +1074,8 @@ public class SelectDirectoryFragment extends SubsonicFragment implements Section
 			@Override
 			protected Void doInBackground() throws Throwable {
 				DownloadService downloadService = getDownloadService();
+				downloadService.clear();
 				downloadService.setArtistRadio(artistId);
-				if(downloadService.size() == 0) {
-					Log.e(TAG, "Failed to create artist radio");
-					throw new Exception("Failed to create artist radio");
-				}
 				return null;
 			}
 

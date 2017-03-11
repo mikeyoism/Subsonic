@@ -19,7 +19,6 @@ package github.daneren2005.dsub.util;
 
 import android.annotation.TargetApi;
 import android.app.Activity;
-import android.graphics.Color;
 import android.support.annotation.StringRes;
 import android.support.v7.app.AlertDialog;
 import android.content.ClipboardManager;
@@ -29,7 +28,6 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -50,15 +48,11 @@ import android.util.Log;
 import android.util.SparseArray;
 import android.view.View;
 import android.view.Gravity;
-import android.view.Window;
-import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 import github.daneren2005.dsub.R;
-import github.daneren2005.dsub.activity.SettingsActivity;
-import github.daneren2005.dsub.activity.SubsonicFragmentActivity;
 import github.daneren2005.dsub.adapter.DetailsAdapter;
 import github.daneren2005.dsub.domain.MusicDirectory;
 import github.daneren2005.dsub.domain.PlayerState;
@@ -66,8 +60,6 @@ import github.daneren2005.dsub.domain.RepeatMode;
 import github.daneren2005.dsub.domain.ServerInfo;
 import github.daneren2005.dsub.receiver.MediaButtonIntentReceiver;
 import github.daneren2005.dsub.service.DownloadService;
-
-import org.apache.http.HttpEntity;
 
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
@@ -80,7 +72,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.math.BigInteger;
 import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
@@ -274,65 +265,6 @@ public final class Util {
 		editor.putBoolean(Constants.PREFERENCES_KEY_ALBUMS_PER_FOLDER + instance, perFolder);
 		editor.commit();
 	}
-
-    public static String getTheme(Context context) {
-        SharedPreferences prefs = getPreferences(context);
-        return prefs.getString(Constants.PREFERENCES_KEY_THEME, null);
-    }
-	public static int getThemeRes(Context context) {
-		return getThemeRes(context, getTheme(context));
-	}
-	public static int getThemeRes(Context context, String theme) {
-		if(context instanceof SubsonicFragmentActivity || context instanceof SettingsActivity) {
-			if(Util.getPreferences(context).getBoolean(Constants.PREFERENCES_KEY_COLOR_ACTION_BAR, true)) {
-				if ("dark".equals(theme)) {
-					return R.style.Theme_DSub_Dark_No_Actionbar;
-				} else if ("black".equals(theme)) {
-					return R.style.Theme_DSub_Black_No_Actionbar;
-				} else if ("holo".equals(theme)) {
-					return R.style.Theme_DSub_Holo_No_Actionbar;
-				} else {
-					return R.style.Theme_DSub_Light_No_Actionbar;
-				}
-			} else {
-				if ("dark".equals(theme)) {
-					return R.style.Theme_DSub_Dark_No_Color;
-				} else if ("black".equals(theme)) {
-					return R.style.Theme_DSub_Black_No_Color;
-				} else if ("holo".equals(theme)) {
-					return R.style.Theme_DSub_Holo_No_Color;
-				} else {
-					return R.style.Theme_DSub_Light_No_Color;
-				}
-			}
-		} else {
-			if ("dark".equals(theme)) {
-				return R.style.Theme_DSub_Dark;
-			} else if ("black".equals(theme)) {
-				return R.style.Theme_DSub_Black;
-			} else if ("holo".equals(theme)) {
-				return R.style.Theme_DSub_Holo;
-			} else {
-				return R.style.Theme_DSub_Light;
-			}
-		}
-	}
-	public static void setTheme(Context context, String theme) {
-		SharedPreferences.Editor editor = getPreferences(context).edit();
-		editor.putString(Constants.PREFERENCES_KEY_THEME, theme);
-		editor.commit();
-	}
-
-	public static void applyTheme(Context context, String theme) {
-		context.setTheme(getThemeRes(context, theme));
-
-		SharedPreferences prefs = Util.getPreferences(context);
-		if(prefs.getBoolean(Constants.PREFERENCES_KEY_OVERRIDE_SYSTEM_LANGUAGE, false)) {
-			Configuration config = new Configuration();
-			config.locale = Locale.ENGLISH;
-			context.getResources().updateConfiguration(config, context.getResources().getDisplayMetrics());
-		}
-	}
 	
 	public static boolean getDisplayTrack(Context context) {
 		SharedPreferences prefs = getPreferences(context);
@@ -412,13 +344,15 @@ public final class Util {
 		String serverUrl = prefs.getString(Constants.PREFERENCES_KEY_SERVER_URL + instance, null);
 		if(allowAltAddress && Util.isWifiConnected(context)) {
 			String SSID = prefs.getString(Constants.PREFERENCES_KEY_SERVER_LOCAL_NETWORK_SSID + instance, "");
-			String currentSSID = Util.getSSID(context);
-			
-			String[] ssidParts = SSID.split(",");
-			if("".equals(SSID) || SSID.equals(currentSSID) || Arrays.asList(ssidParts).contains(currentSSID)) {
-				String internalUrl = prefs.getString(Constants.PREFERENCES_KEY_SERVER_INTERNAL_URL + instance, null);
-				if(internalUrl != null && !"".equals(internalUrl) && !"http://".equals(internalUrl)) {
-					serverUrl = internalUrl;
+			if(!SSID.isEmpty()) {
+				String currentSSID = Util.getSSID(context);
+
+				String[] ssidParts = SSID.split(",");
+				if ("".equals(SSID) || SSID.equals(currentSSID) || Arrays.asList(ssidParts).contains(currentSSID)) {
+					String internalUrl = prefs.getString(Constants.PREFERENCES_KEY_SERVER_INTERNAL_URL + instance, null);
+					if (internalUrl != null && !"".equals(internalUrl) && !"http://".equals(internalUrl)) {
+						serverUrl = internalUrl;
+					}
 				}
 			}
 		}
@@ -476,6 +410,18 @@ public final class Util {
 		builder.append(prefs.getString(Constants.PREFERENCES_KEY_USERNAME + instance, null));
 
 		return builder.toString().hashCode();
+	}
+
+	public static String getBlockTokenUsePref(Context context, int instance) {
+		return Constants.CACHE_BLOCK_TOKEN_USE + Util.getRestUrl(context, null, instance, false);
+	}
+	public static boolean getBlockTokenUse(Context context, int instance) {
+		return getPreferences(context).getBoolean(getBlockTokenUsePref(context, instance), false);
+	}
+	public static void setBlockTokenUse(Context context, int instance, boolean block) {
+		SharedPreferences.Editor editor = getPreferences(context).edit();
+		editor.putBoolean(getBlockTokenUsePref(context, instance), block);
+		editor.commit();
 	}
 
 	public static String replaceInternalUrl(Context context, String url) {
@@ -648,13 +594,6 @@ public final class Util {
 		}
 	}
 
-    public static String getContentType(HttpEntity entity) {
-        if (entity == null || entity.getContentType() == null) {
-            return null;
-        }
-        return entity.getContentType().getValue();
-    }
-
     public static int getRemainingTrialDays(Context context) {
         SharedPreferences prefs = getPreferences(context);
         long installTime = prefs.getLong(Constants.PREFERENCES_KEY_INSTALL_TIME, 0L);
@@ -694,9 +633,17 @@ public final class Util {
 		editor.commit();
 	}
 
+	public static boolean shouldCacheDuringCasting(Context context) {
+		return Util.getPreferences(context).getBoolean(Constants.PREFERENCES_KEY_CAST_CACHE, false);
+	}
+
 	public static boolean shouldStartOnHeadphones(Context context) {
 		SharedPreferences prefs = getPreferences(context);
 		return prefs.getBoolean(Constants.PREFERENCES_KEY_START_ON_HEADPHONES, false);
+	}
+
+	public static String getSongPressAction(Context context) {
+		return getPreferences(context).getString(Constants.PREFERENCES_KEY_SONG_PRESS_ACTION, "all");
 	}
 
     /**
@@ -915,6 +862,10 @@ public final class Util {
 		return formatDate(context, dateString, true);
 	}
 	public static String formatDate(Context context, String dateString, boolean includeTime) {
+		if(dateString == null) {
+			return "";
+		}
+
 		try {
 			dateString = dateString.replace(' ', 'T');
 			boolean isDateNormalized = ServerInfo.checkServerVersion(context, "1.11");
@@ -1158,7 +1109,7 @@ public final class Util {
     }
 
 	public static boolean isAllowedToDownload(Context context) {
-		return !isWifiRequiredForDownload(context) || isWifiConnected(context);
+		return isNetworkConnected(context, true) && !isOffline(context);
 	}
     public static boolean isWifiRequiredForDownload(Context context) {
         SharedPreferences prefs = getPreferences(context);
@@ -1184,22 +1135,22 @@ public final class Util {
 		showDialog(context, android.R.drawable.ic_dialog_info, title, message, linkify);
 	}
 
-	private static void showDialog(Context context, int icon, int titleId, int messageId) {
+	public static void showDialog(Context context, int icon, int titleId, int messageId) {
 		showDialog(context, icon, titleId, messageId, true);
 	}
-	private static void showDialog(Context context, int icon, int titleId, String message) {
+	public static void showDialog(Context context, int icon, int titleId, String message) {
 		showDialog(context, icon, titleId, message, true);
 	}
-	private static void showDialog(Context context, int icon, String title, String message) {
+	public static void showDialog(Context context, int icon, String title, String message) {
 		showDialog(context, icon, title, message, true);
 	}
-	private static void showDialog(Context context, int icon, int titleId, int messageId, boolean linkify) {
+	public static void showDialog(Context context, int icon, int titleId, int messageId, boolean linkify) {
 		showDialog(context, icon, context.getResources().getString(titleId), context.getResources().getString(messageId), linkify);
 	}
-	private static void showDialog(Context context, int icon, int titleId, String message, boolean linkify) {
+	public static void showDialog(Context context, int icon, int titleId, String message, boolean linkify) {
 		showDialog(context, icon, context.getResources().getString(titleId), message, linkify);
 	}
-	private static void showDialog(Context context, int icon, String title, String message, boolean linkify) {
+	public static void showDialog(Context context, int icon, String title, String message, boolean linkify) {
 		SpannableString ss = new SpannableString(message);
 		if(linkify) {
 			Linkify.addLinks(ss, Linkify.ALL);
@@ -1245,32 +1196,35 @@ public final class Util {
 		}
 		showDetailsDialog(context, context.getResources().getString(title), headerStrings, details);
 	}
-	public static void showDetailsDialog(Context context, String title, List<String> headers, List<String> details) {
+	public static void showDetailsDialog(Context context, String title, List<String> headers, final List<String> details) {
 		ListView listView = new ListView(context);
 		listView.setAdapter(new DetailsAdapter(context, R.layout.details_item, headers, details));
 		listView.setDivider(null);
 		listView.setScrollbarFadingEnabled(false);
 
-    // Let the user long-click on a row to copy its value to the clipboard
-    final Context contextRef = context;
-    listView.setOnItemLongClickListener(new ListView.OnItemLongClickListener() {
-      @Override
-      public boolean onItemLongClick(AdapterView<?> parent, View view, int pos, long id) {
+		// Let the user long-click on a row to copy its value to the clipboard
+		final Context contextRef = context;
+		listView.setOnItemLongClickListener(new ListView.OnItemLongClickListener() {
+			@Override
+			public boolean onItemLongClick(AdapterView<?> parent, View view, int pos, long id) {
+				TextView nameView = (TextView) view.findViewById(R.id.detail_name);
+				TextView detailsView = (TextView) view.findViewById(R.id.detail_value);
+				if(nameView == null || detailsView == null) {
+					return false;
+				}
 
-        TextView nameView = (TextView) view.findViewById(R.id.detail_name);
-        TextView detailsView = (TextView) view.findViewById(R.id.detail_value);
-        CharSequence name = nameView.getText();
-        CharSequence value = detailsView.getText();
+				CharSequence name = nameView.getText();
+				CharSequence value = detailsView.getText();
 
-        ClipboardManager clipboard = (ClipboardManager) contextRef.getSystemService(Context.CLIPBOARD_SERVICE);
-        ClipData clip = ClipData.newPlainText(name, value);
-        clipboard.setPrimaryClip(clip);
+				ClipboardManager clipboard = (ClipboardManager) contextRef.getSystemService(Context.CLIPBOARD_SERVICE);
+				ClipData clip = ClipData.newPlainText(name, value);
+				clipboard.setPrimaryClip(clip);
 
-        toast(contextRef, "Copied " + name + " to clipboard");
+				toast(contextRef, "Copied " + name + " to clipboard");
 
-        return true;
-      }
-    });
+				return true;
+			}
+		});
 
 		new AlertDialog.Builder(context)
 				// .setIcon(android.R.drawable.ic_dialog_info)
@@ -1411,72 +1365,79 @@ public final class Util {
      * <p>Broadcasts the given song info as the new song being played.</p>
      */
     public static void broadcastNewTrackInfo(Context context, MusicDirectory.Entry song) {
-		DownloadService downloadService = (DownloadService)context;
-        Intent intent = new Intent(EVENT_META_CHANGED);
-		Intent avrcpIntent = new Intent(AVRCP_METADATA_CHANGED);
+		try {
+			Intent intent = new Intent(EVENT_META_CHANGED);
+			Intent avrcpIntent = new Intent(AVRCP_METADATA_CHANGED);
 
-        if (song != null) {
-            intent.putExtra("title", song.getTitle());
-            intent.putExtra("artist", song.getArtist());
-            intent.putExtra("album", song.getAlbum());
+			if (song != null) {
+				intent.putExtra("title", song.getTitle());
+				intent.putExtra("artist", song.getArtist());
+				intent.putExtra("album", song.getAlbum());
 
-            File albumArtFile = FileUtil.getAlbumArtFile(context, song);
-            intent.putExtra("coverart", albumArtFile.getAbsolutePath());
-			avrcpIntent.putExtra("playing", true);
-        } else {
-            intent.putExtra("title", "");
-            intent.putExtra("artist", "");
-            intent.putExtra("album", "");
-            intent.putExtra("coverart", "");
-			avrcpIntent.putExtra("playing", false);
-        }
-		addTrackInfo(context, song, avrcpIntent);
+				File albumArtFile = FileUtil.getAlbumArtFile(context, song);
+				intent.putExtra("coverart", albumArtFile.getAbsolutePath());
+				avrcpIntent.putExtra("playing", true);
+			} else {
+				intent.putExtra("title", "");
+				intent.putExtra("artist", "");
+				intent.putExtra("album", "");
+				intent.putExtra("coverart", "");
+				avrcpIntent.putExtra("playing", false);
+			}
+			addTrackInfo(context, song, avrcpIntent);
 
-        context.sendBroadcast(intent);
-		context.sendBroadcast(avrcpIntent);
+			context.sendBroadcast(intent);
+			context.sendBroadcast(avrcpIntent);
+		} catch(Exception e) {
+			Log.e(TAG, "Failed to broadcastNewTrackInfo", e);
+		}
     }
 
     /**
      * <p>Broadcasts the given player state as the one being set.</p>
      */
     public static void broadcastPlaybackStatusChange(Context context, MusicDirectory.Entry song, PlayerState state) {
-        Intent intent = new Intent(EVENT_PLAYSTATE_CHANGED);
-		Intent avrcpIntent = new Intent(AVRCP_PLAYSTATE_CHANGED);
+		try {
+			Intent intent = new Intent(EVENT_PLAYSTATE_CHANGED);
+			Intent avrcpIntent = new Intent(AVRCP_PLAYSTATE_CHANGED);
 
-        switch (state) {
-            case STARTED:
-                intent.putExtra("state", "play");
-				avrcpIntent.putExtra("playing", true);
-                break;
-            case STOPPED:
-                intent.putExtra("state", "stop");
-				avrcpIntent.putExtra("playing", false);
-                break;
-            case PAUSED:
-                intent.putExtra("state", "pause");
-				avrcpIntent.putExtra("playing", false);
-                break;
-			case PREPARED:
-				// Only send quick pause event for samsung devices, causes issues for others
-				if(Build.MANUFACTURER.toLowerCase().indexOf("samsung") != -1) {
+			switch (state) {
+				case STARTED:
+					intent.putExtra("state", "play");
+					avrcpIntent.putExtra("playing", true);
+					break;
+				case STOPPED:
+					intent.putExtra("state", "stop");
 					avrcpIntent.putExtra("playing", false);
-				} else {
-					return; // Don't broadcast anything
-				}
-				break;
-            case COMPLETED:
-                intent.putExtra("state", "complete");
-				avrcpIntent.putExtra("playing", false);
-                break;
-            default:
-                return; // No need to broadcast.
-        }
-		addTrackInfo(context, song, avrcpIntent);
+					break;
+				case PAUSED:
+					intent.putExtra("state", "pause");
+					avrcpIntent.putExtra("playing", false);
+					break;
+				case PREPARED:
+					// Only send quick pause event for samsung devices, causes issues for others
+					if (Build.MANUFACTURER.toLowerCase().indexOf("samsung") != -1) {
+						avrcpIntent.putExtra("playing", false);
+					} else {
+						return; // Don't broadcast anything
+					}
+					break;
+				case COMPLETED:
+					intent.putExtra("state", "complete");
+					avrcpIntent.putExtra("playing", false);
+					break;
+				default:
+					return; // No need to broadcast.
+			}
+			addTrackInfo(context, song, avrcpIntent);
 
-		if(state != PlayerState.PREPARED) {
-			context.sendBroadcast(intent);
+			if (state != PlayerState.PREPARED) {
+				context.sendBroadcast(intent);
+			}
+			context.sendBroadcast(avrcpIntent);
+		} catch(Exception e) {
+			Log.e(TAG, "Failed to broadcastPlaybackStatusChange", e);
 		}
-		context.sendBroadcast(avrcpIntent);
     }
 
 	private static void addTrackInfo(Context context, MusicDirectory.Entry song, Intent intent) {
@@ -1492,6 +1453,7 @@ public final class Util {
 			intent.putExtra("duration", (long) downloadService.getPlayerDuration());
 			intent.putExtra("position", (long) downloadService.getPlayerPosition());
 			intent.putExtra("coverart", albumArtFile.getAbsolutePath());
+			intent.putExtra("package","github.daneren2005.dsub");
 		} else {
 			intent.putExtra("track", "");
 			intent.putExtra("artist", "");
@@ -1501,6 +1463,7 @@ public final class Util {
 			intent.putExtra("duration", (long) 0);
 			intent.putExtra("position", (long) 0);
 			intent.putExtra("coverart", "");
+			intent.putExtra("package","github.daneren2005.dsub");
 		}
 	}
 	

@@ -150,11 +150,23 @@ public class SongDBHandler extends SQLiteOpenHelper {
 		db.close();
 	}
 
+	public boolean hasBeenPlayed(MusicDirectory.Entry entry) {
+		Long[] lastPlayed = getLastPlayed(entry);
+		return lastPlayed != null && lastPlayed[0] != null && lastPlayed[0] > 0;
+	}
+	public boolean hasBeenCompleted(MusicDirectory.Entry entry) {
+		Long[] lastPlayed = getLastPlayed(entry);
+		return lastPlayed != null && lastPlayed[1] != null && lastPlayed[1] > 0;
+	}
 	public synchronized Long[] getLastPlayed(MusicDirectory.Entry entry) {
 		return getLastPlayed(getOnlineSongId(entry));
 	}
 	protected synchronized Long[] getLastPlayed(Pair<Integer, String> pair) {
-		return getLastPlayed(pair.getFirst(), pair.getSecond());
+		if(pair == null) {
+			return null;
+		} else {
+			return getLastPlayed(pair.getFirst(), pair.getSecond());
+		}
 	}
 	public synchronized Long[] getLastPlayed(int serverKey, String id) {
 		SQLiteDatabase db = this.getReadableDatabase();
@@ -169,9 +181,12 @@ public class SongDBHandler extends SQLiteOpenHelper {
 			dates[0] = cursor.getLong(0);
 			dates[1] = cursor.getLong(1);
 			return dates;
-		} catch(Exception e) {}
-
-		return null;
+		} catch(Exception e) {
+			return null;
+		}
+		finally {
+			db.close();
+		}
 	}
 
 	public synchronized Pair<Integer, String> getOnlineSongId(MusicDirectory.Entry entry) {
@@ -210,9 +225,12 @@ public class SongDBHandler extends SQLiteOpenHelper {
 		try {
 			cursor.moveToFirst();
 			return new Pair(cursor.getInt(0), cursor.getString(1));
-		} catch(Exception e) {}
-
-		return null;
+		} catch(Exception e) {
+			return null;
+		}
+		finally {
+			db.close();
+		}
 	}
 	public synchronized Pair<Integer, String> getIdFromPath(int serverKey, String path) {
 		SQLiteDatabase db = this.getReadableDatabase();
@@ -223,9 +241,12 @@ public class SongDBHandler extends SQLiteOpenHelper {
 		try {
 			cursor.moveToFirst();
 			return new Pair(cursor.getInt(0), cursor.getString(1));
-		} catch(Exception e) {}
-
-		return null;
+		} catch(Exception e) {
+			return null;
+		}
+		finally {
+			db.close();
+		}
 	}
 
 	public static SongDBHandler getHandler(Context context) {

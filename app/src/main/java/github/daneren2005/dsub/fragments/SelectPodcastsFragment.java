@@ -154,25 +154,18 @@ public class SelectPodcastsFragment extends SelectRecyclerFragment<Serializable>
 		if(newestEpisodes == null || newestEpisodes.getChildrenSize() == 0) {
 			return new PodcastChannelAdapter(context, channels, hasCoverArt ? getImageLoader() : null, this, largeAlbums);
 		} else {
-			List<String> headers = Arrays.asList(PodcastChannelAdapter.EPISODE_HEADER, PodcastChannelAdapter.CHANNEL_HEADER);
+			Resources res = context.getResources();
+			List<String> headers = Arrays.asList(res.getString(R.string.main_albums_newest), res.getString(R.string.select_podcasts_channels));
 
 			List<MusicDirectory.Entry> episodes = newestEpisodes.getChildren(false, true);
 			List<Serializable> serializableEpisodes = new ArrayList<>();
-
-			// Put 3 in current list
-			while(serializableEpisodes.size() < 3 && !episodes.isEmpty()) {
-				serializableEpisodes.add(episodes.remove(0));
-			}
-
-			// Put rest in extra set
-			List<Serializable> extraEpisodes = new ArrayList<>();
-			extraEpisodes.addAll(episodes);
+			serializableEpisodes.addAll(episodes);
 
 			List<List<Serializable>> sections = new ArrayList<>();
 			sections.add(serializableEpisodes);
 			sections.add(channels);
 
-			return new PodcastChannelAdapter(context, headers, sections, extraEpisodes, ServerInfo.checkServerVersion(context, "1.13") ? getImageLoader() : null, this, largeAlbums);
+			return new PodcastChannelAdapter(context, headers, sections, ServerInfo.checkServerVersion(context, "1.13") ? getImageLoader() : null, this, largeAlbums);
 		}
 	}
 
@@ -182,7 +175,7 @@ public class SelectPodcastsFragment extends SelectRecyclerFragment<Serializable>
 
 		if(!Util.isOffline(context) && ServerInfo.hasNewestPodcastEpisodes(context)) {
 			try {
-				newestEpisodes = musicService.getNewestPodcastEpisodes(10, context, listener);
+				newestEpisodes = musicService.getNewestPodcastEpisodes(refresh, context, listener, 10);
 
 				for(MusicDirectory.Entry entry: newestEpisodes.getChildren()) {
 					for(PodcastChannel channel: channels) {
@@ -246,12 +239,12 @@ public class SelectPodcastsFragment extends SelectRecyclerFragment<Serializable>
 				return;
 			}
 
-			playNow(Arrays.asList((MusicDirectory.Entry) episode));
+			onSongPress(Arrays.asList((MusicDirectory.Entry) episode), episode, false);
 		}
 	}
 
 	@Override
-	public GridLayoutManager.SpanSizeLookup getSpanSizeLookup() {
+	public GridLayoutManager.SpanSizeLookup getSpanSizeLookup(final GridLayoutManager gridLayoutManager) {
 		return new GridLayoutManager.SpanSizeLookup() {
 			@Override
 			public int getSpanSize(int position) {
@@ -259,7 +252,7 @@ public class SelectPodcastsFragment extends SelectRecyclerFragment<Serializable>
 				if(adapter != null) {
 					int viewType = getCurrentAdapter().getItemViewType(position);
 					if (viewType == SectionAdapter.VIEW_TYPE_HEADER || viewType == PodcastChannelAdapter.VIEW_TYPE_PODCAST_EPISODE || viewType == PodcastChannelAdapter.VIEW_TYPE_PODCAST_LEGACY) {
-						return getRecyclerColumnCount();
+						return gridLayoutManager.getSpanCount();
 					} else {
 						return 1;
 					}

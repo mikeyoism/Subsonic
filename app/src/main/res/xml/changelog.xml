@@ -1,5 +1,120 @@
 <?xml version="1.0" encoding="utf-8"?>
 <changelog>
+	<release version="5.3.3" versioncode="191" releasedate="11/9/2016">
+		<change>Add support for Android 7's split screen UI</change>
+		<change>Fix for Android 7 not playing</change>
+		<change>Fix basic authentication for servers</change>
+		<change>Fix top track songs using different save file</change>
+	</release>
+	<release version="5.3.2" versioncode="190" releasedate="10/22/2016">
+		<change>Add support for casting Internet Radio to ChromeCast/DLNA</change>
+		<change>Add support for Play Title by Artist from Google Search</change>
+		<change>Move to more modern connection framework</change>
+		<change>Use Google Play SSL</change>
+		<change>Show album instead of artist for Show all media</change>
+		<change>Ask for location permissions for Day/Night themes</change>
+		<change>Fix a change to the ChromeCast API</change>
+		<change>Fix Show all media sometimes failing</change>
+	</release>
+	<release version="5.3.1" versioncode="187" releasedate="10/4/2016">
+		<change>Fix Internet Radio streams which point to playlists</change>
+		<change>Don't show playback speed button below Android 6.0</change>
+	</release>
+	<release version="5.3" versioncode="186" releasedate="9/23/2016">
+		<change>Listen to Radio Internet Stations</change>
+		<change>Automatic Day/Night theme</change>
+		<change>Android 6.0 runtime permissions</change>
+		<change>Custom variable playback speed</change>
+		<change>Add Play Now for songs when click action is add to queue</change>
+		<change>More secure connections with tokens (Subsonic 6+)</change>
+		<change>Auto skip uncached songs when no network</change>
+		<change>Shrink install size</change>
+		<change>Fix DLNA casting on Android 7.0+</change>
+	</release>
+	<release version="5.2.2" versioncode="184" releasedate="8/30/2016">
+		<change>Fix lagging in landscape view on the Now Playing screen</change>
+	</release>
+	<release version="5.2.1" versioncode="183" releasedate="8/24/2016">
+		<change>Add option for different actions when pressing a song</change>
+		<change>Fix some N release issues</change>
+		<change>Fix grid alignment for some albums</change>
+	</release>
+	<release version="5.2" versioncode="182" releasedate="7/27/2016">
+		<change>Variable Playback Speed (Android 6.0+)</change>
+		<change>Show album instead of artist on Top Tracks</change>
+		<change>Fix search/comments with ' not working</change>
+		<change>Fix double press to skip from some headsets</change>
+		<change>Fix newer versions of Madsonic's Artist Radio</change>
+		<change>Fix no SSID using local network address on all WiFi connections</change>
+		<change>Fix rotation/sleep while EQ was visible</change>
+		<change>Fix being able to add albums to playlists</change>
+		<change>Fix cast dialog in landscape</change>
+	</release>
+	<release version="5.1.9" versioncode="181" releasedate="6/13/2016">
+		<change>Fix First level artists option</change>
+		<change>Fix some artist menu items missing</change>
+	</release>
+	<release version="5.1.8" versioncode="179" releasedate="6/9/2016">
+		<change>Improved Search Bar</change>
+		<change>Display songs in root folder</change>
+		<change>Heads Up Setting: Only when out of app</change>
+		<change>Speed up resuming app from notifications/widgets</change>
+		<change>Bluetooth: Double click play/pause button to skip to next some</change>
+		<change>Auto: Previous/Next rewind/fast forward on Podcasts/Audio Books</change>
+		<change>Fix playlist not overwriting when resumed from bookmark</change>
+		<change>Fix some bluetooth devices sending next/previous multiple times</change>
+		<change>Fix reverting to stock Subsonic after using Madsonic 6+ servers</change>
+		<change>Fix Podcast list cache not working with no internet</change>
+	</release>
+	<release version="5.1.7" versioncode="177" releasedate="4/22/2016">
+		<change>Audio Books/Podcasts: Replace back/forward with rewind/fast forward buttons</change>
+		<change>Expandable Search Results</change>
+		<change>Add option to cache while casting</change>
+		<change>Add optional Heads Up Notifications (Lollipop+)</change>
+		<change>Clicking bookmarked song plays entire album from bookmarked position</change>
+		<change>Auto: Remove podcast/album limit now that Google removed limit</change>
+		<change>Fix tall album art running into controls</change>
+		<change>Fix Show Artist not being an option when browsing By Tags</change>
+		<change>Fix 1-star song background on darker themes</change>
+		<change>Fix Bluetooth multiple skips</change>
+	</release>
+	<release version="5.1.6" versioncode="175" releasedate="3/16/2016">
+		<change>Podcasts/Audio Books: Show listened indicator</change>
+		<change>Podcasts/Audio Books: Improve what is considered fully played</change>
+		<change>Improved Artist sorting to closer match Web GUI</change>
+		<change>Show Artist/Album from Search and Album Lists</change>
+		<change>Videos: ability to star</change>
+		<change>Admin: Show/update Video Conversion role (Subsonic 6.0+)</change>
+		<change>Stop background sync if lose Wifi</change>
+		<change>Fix upsampling mp3s when cache rate is set to unlimited</change>
+		<change>Fix "Failed to create artist radio" error</change>
+		<change>Fix rare issue causing arrow to get stuck</change>
+		<change>Fix rare issue with background download getting stuck</change>
+	</release>
+	<release version="5.1.5" versioncode="173" releasedate="2/15/2016">
+		<change>Toggle for Batch Mode on Now Playing</change>
+		<change>Admin tab: view/update music folders (Subsonic 5.2+)</change>
+		<change>Tag Browsing: can specify Music Folder (Subsonic 6.0+)</change>
+		<change>Show shuffle/radio mode in title bar</change>
+		<change>Madsonic only: Songs lists on Home tab</change>
+		<change>Clicking songs adds songs before it as well</change>
+		<change>Similar Artists: show missing artists below main list</change>
+		<change>Improve offline search (thanks fxthomas)</change>
+		<change>Improve podcast date formatting</change>
+		<change>Increase max sleep timer to 1 hour</change>
+		<change>Cast: added setting to disable DLNA gapless playback</change>
+		<change>Cast: added setting to stream original source files</change>
+		<change>Long press details dialogs to copy information</change>
+		<change>Android Auto improvements</change>
+		<change>Top Tracks: display #</change>
+		<change>Require current password when changing password</change>
+		<change>Improved Share Details dialog</change>
+		<change>Sort Music Folders alphabetically</change>
+		<change>Fix repeating same song if multiples copies in play queue</change>
+		<change>Fix freeze on Play x from Google Now</change>
+		<change>Fix Show Artist/Album back behavior</change>
+		<change>Minor Chromecast fixes</change>
+	</release>
 	<release version="5.1.4" versioncode="172" releasedate="1/17/2016">
 		<change>Minor theme improvements</change>
 	</release>

@@ -36,6 +36,8 @@ import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.KeyEvent;
+
+import github.daneren2005.dsub.domain.InternetRadioStation;
 import github.daneren2005.dsub.domain.MusicDirectory;
 import github.daneren2005.dsub.domain.PlayerQueue;
 import github.daneren2005.dsub.domain.PlayerState;
@@ -56,6 +58,7 @@ import static github.daneren2005.dsub.domain.PlayerState.PREPARING;
 public class DownloadServiceLifecycleSupport {
 	private static final String TAG = DownloadServiceLifecycleSupport.class.getSimpleName();
 	public static final String FILENAME_DOWNLOADS_SER = "downloadstate2.ser";
+	private static final int DEBOUNCE_TIME = 200;
 
 	private final DownloadService downloadService;
 	private Looper eventLooper;
@@ -154,6 +157,8 @@ public class DownloadServiceLifecycleSupport {
 
 		// Pause temporarily on incoming phone calls.
 		phoneStateListener = new MyPhoneStateListener();
+
+		// Android 6.0 removes requirement for android.Manifest.permission.READ_PHONE_STATE;
 		TelephonyManager telephonyManager = (TelephonyManager) downloadService.getSystemService(Context.TELEPHONY_SERVICE);
 		telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
 
@@ -225,6 +230,7 @@ public class DownloadServiceLifecycleSupport {
 							}
 							editor.commit();
 
+							downloadService.clear();
 							downloadService.setShufflePlayEnabled(true);
 						} else {
 							downloadService.start();
@@ -306,7 +312,7 @@ public class DownloadServiceLifecycleSupport {
 		FileUtil.serialize(downloadService, state, FILENAME_DOWNLOADS_SER);
 
 		// If we are on Subsonic 5.2+, save play queue
-		if(serializeRemote && ServerInfo.canSavePlayQueue(downloadService) && !Util.isOffline(downloadService) && state.songs.size() > 0) {
+		if(serializeRemote && ServerInfo.canSavePlayQueue(downloadService) && !Util.isOffline(downloadService) && state.songs.size() > 0 && !(state.songs.get(0) instanceof InternetRadioStation)) {
 			// Cancel any currently running tasks
 			if(currentSavePlayQueueTask != null) {
 				currentSavePlayQueueTask.cancel();
@@ -384,14 +390,25 @@ public class DownloadServiceLifecycleSupport {
 		return lastChange;
 	}
 
-	private void handleKeyEvent(KeyEvent event) {
-		if(event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+	public void handleKeyEvent(KeyEvent event) {
+		if(event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() > 0) {
+			switch (event.getKeyCode()) {
+				case RemoteControlClient.FLAG_KEY_MEDIA_PREVIOUS:
+				case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
+					downloadService.fastForward();
+					break;
+				case RemoteControlClient.FLAG_KEY_MEDIA_NEXT:
+				case KeyEvent.KEYCODE_MEDIA_NEXT:
+					downloadService.rewind();
+					break;
+			}
+		} else if(event.getAction() == KeyEvent.ACTION_UP) {
 			switch (event.getKeyCode()) {
 				case RemoteControlClient.FLAG_KEY_MEDIA_PLAY_PAUSE:
-				case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
 					downloadService.togglePlayPause();
 					break;
 				case KeyEvent.KEYCODE_HEADSETHOOK:
+				case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
 					if(lastPressTime < (System.currentTimeMillis() - 500)) {
 						lastPressTime = System.currentTimeMillis();
 						downloadService.togglePlayPause();
@@ -401,11 +418,23 @@ public class DownloadServiceLifecycleSupport {
 					break;
 				case RemoteControlClient.FLAG_KEY_MEDIA_PREVIOUS:
 				case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
-					downloadService.previous();
+					if(lastPressTime < (System.currentTimeMillis() - DEBOUNCE_TIME)) {
+						lastPressTime = System.currentTimeMillis();
+						downloadService.previous();
+					}
 					break;
 				case RemoteControlClient.FLAG_KEY_MEDIA_NEXT:
 				case KeyEvent.KEYCODE_MEDIA_NEXT:
-					downloadService.next();
+					if(lastPressTime < (System.currentTimeMillis() - DEBOUNCE_TIME)) {
+						lastPressTime = System.currentTimeMillis();
+						downloadService.next();
+					}
+					break;
+				case KeyEvent.KEYCODE_MEDIA_REWIND:
+					downloadService.rewind();
+					break;
+				case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD:
+					downloadService.fastForward();
 					break;
 				case RemoteControlClient.FLAG_KEY_MEDIA_STOP:
 				case KeyEvent.KEYCODE_MEDIA_STOP:

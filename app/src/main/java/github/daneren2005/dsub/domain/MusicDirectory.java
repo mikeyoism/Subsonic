@@ -24,6 +24,8 @@ import android.content.SharedPreferences;
 import android.media.MediaMetadataRetriever;
 import android.os.Build;
 import android.util.Log;
+
+import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -31,6 +33,7 @@ import java.io.File;
 import java.io.Serializable;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Locale;
 
 import github.daneren2005.dsub.service.DownloadService;
 import github.daneren2005.dsub.util.Constants;
@@ -233,6 +236,7 @@ public class MusicDirectory implements Serializable {
 		private String album;
 		private String artist;
 		private Integer track;
+		private Integer customOrder;
 		private Integer year;
 		private String genre;
 		private String contentType;
@@ -306,6 +310,10 @@ public class MusicDirectory implements Serializable {
 		public void rebaseTitleOffPath() {
 			try {
 				String filename = getPath();
+				if(filename == null) {
+					return;
+				}
+
 				int index = filename.lastIndexOf('/');
 				if (index != -1) {
 					filename = filename.substring(index + 1);
@@ -416,6 +424,13 @@ public class MusicDirectory implements Serializable {
         public void setTrack(Integer track) {
             this.track = track;
         }
+
+		public Integer getCustomOrder() {
+			return customOrder;
+		}
+		public void setCustomOrder(Integer customOrder) {
+			this.customOrder = customOrder;
+		}
 
         public Integer getYear() {
             return year;
@@ -617,9 +632,12 @@ public class MusicDirectory implements Serializable {
 	
 	public static class EntryComparator implements Comparator<Entry> {
 		private boolean byYear;
+		private Collator collator;
 		
 		public EntryComparator(boolean byYear) {
 			this.byYear = byYear;
+			this.collator = Collator.getInstance(Locale.US);
+			this.collator.setStrength(Collator.PRIMARY);
 		}
 		
 		public int compare(Entry lhs, Entry rhs) {
@@ -639,8 +657,8 @@ public class MusicDirectory implements Serializable {
 						return 1;
 					}
 				}
-				
-				return lhs.getAlbumDisplay().compareToIgnoreCase(rhs.getAlbumDisplay());
+
+				return collator.compare(lhs.getAlbumDisplay(), rhs.getAlbumDisplay());
 			}
 			
 			Integer lhsDisc = lhs.getDiscNumber();
@@ -664,7 +682,7 @@ public class MusicDirectory implements Serializable {
 				return 1;
 			}
 
-			return lhs.getTitle().compareToIgnoreCase(rhs.getTitle());
+			return collator.compare(lhs.getTitle(), rhs.getTitle());
 		}
 		
 		public static void sort(List<Entry> entries) {

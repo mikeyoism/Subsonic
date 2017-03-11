@@ -1,6 +1,7 @@
 package github.daneren2005.dsub.fragments;
 
 import android.content.Intent;
+import android.content.pm.PackageInfo;
 import android.content.res.Resources;
 import android.net.Uri;
 import android.os.Build;
@@ -63,6 +64,7 @@ public class MainFragment extends SelectRecyclerFragment<Integer> {
 	@Override
 	public void onCreateOptionsMenu(Menu menu, MenuInflater menuInflater) {
 		menuInflater.inflate(R.menu.main, menu);
+		onFinishSetupOptionsMenu(menu);
 
 		try {
 			if (!ServerInfo.isMadsonic(context) || !UserUtil.isCurrentAdmin()) {
@@ -269,7 +271,7 @@ public class MainFragment extends SelectRecyclerFragment<Integer> {
 
 	private void getLogs() {
 		try {
-			final String version = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).versionName;
+			final PackageInfo packageInfo = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
 			new LoadingTask<String>(context) {
 				@Override
 				protected String doInBackground() throws Throwable {
@@ -298,6 +300,7 @@ public class MainFragment extends SelectRecyclerFragment<Integer> {
 
 					URL url = new URL("https://pastebin.com/api/api_post.php");
 					HttpsURLConnection urlConnection = (HttpsURLConnection) url.openConnection();
+					StringBuffer responseBuffer = new StringBuffer();
 					try {
 						urlConnection.setReadTimeout(10000);
 						urlConnection.setConnectTimeout(15000);
@@ -339,17 +342,16 @@ public class MainFragment extends SelectRecyclerFragment<Integer> {
 						writer.flush();
 						writer.close();
 						os.close();
+
+						BufferedReader in = new BufferedReader(new InputStreamReader(urlConnection.getInputStream()));
+						String inputLine;
+						while ((inputLine = in.readLine()) != null) {
+							responseBuffer.append(inputLine);
+						}
+						in.close();
 					} finally {
 						urlConnection.disconnect();
 					}
-
-					BufferedReader in = new BufferedReader(new InputStreamReader(urlConnection.getInputStream()));
-					String inputLine;
-					StringBuffer responseBuffer = new StringBuffer();
-					while ((inputLine = in.readLine()) != null) {
-						responseBuffer.append(inputLine);
-					}
-					in.close();
 
 					String response = responseBuffer.toString();
 					if(response.indexOf("http") == 0) {
@@ -361,6 +363,7 @@ public class MainFragment extends SelectRecyclerFragment<Integer> {
 
 				@Override
 				protected void error(Throwable error) {
+					Log.e(TAG, "Failed to gather logs", error);
 					Util.toast(context, "Failed to gather logs");
 				}
 
@@ -371,10 +374,11 @@ public class MainFragment extends SelectRecyclerFragment<Integer> {
 					footer += "\nDevice Name: " + Build.MANUFACTURER + " "  + Build.PRODUCT;
 					footer += "\nROM: " + Build.DISPLAY;
 					footer += "\nLogs: " + logcat;
+					footer += "\nBuild Number: " + packageInfo.versionCode;
 
 					Intent email = new Intent(Intent.ACTION_SENDTO,
 						Uri.fromParts("mailto", "dsub.android@gmail.com", null));
-					email.putExtra(Intent.EXTRA_SUBJECT, "DSub " + version + " Error Logs");
+					email.putExtra(Intent.EXTRA_SUBJECT, "DSub " + packageInfo.versionName + " Error Logs");
 					email.putExtra(Intent.EXTRA_TEXT, "Describe the problem here\n\n\n" + footer);
 					startActivity(email);
 				}

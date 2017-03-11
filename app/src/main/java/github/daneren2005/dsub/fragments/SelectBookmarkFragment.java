@@ -18,6 +18,7 @@
 */
 package github.daneren2005.dsub.fragments;
 
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -28,6 +29,7 @@ import github.daneren2005.dsub.domain.Bookmark;
 import github.daneren2005.dsub.domain.MusicDirectory;
 import github.daneren2005.dsub.service.DownloadService;
 import github.daneren2005.dsub.service.MusicService;
+import github.daneren2005.dsub.util.Constants;
 import github.daneren2005.dsub.util.MenuUtil;
 import github.daneren2005.dsub.util.ProgressListener;
 import github.daneren2005.dsub.util.SilentBackgroundTask;
@@ -89,19 +91,29 @@ public class SelectBookmarkFragment extends SelectRecyclerFragment<MusicDirector
 			return;
 		}
 
-		new SilentBackgroundTask<Void>(context) {
-			@Override
-			protected Void doInBackground() throws Throwable {
-				downloadService.clear();
-				downloadService.download(Arrays.asList(bookmark), false, true, false, false, 0, bookmark.getBookmark().getPosition());
-				return null;
-			}
-			
-			@Override
-			protected void done(Void result) {
-				context.openNowPlaying();
-			}
-		}.execute();
+		boolean allowPlayAll = ((!Util.isTagBrowsing(context) && bookmark.getParent() != null) || (Util.isTagBrowsing(context) && bookmark.getAlbumId() != null)) && !bookmark.isPodcast();
+		if(allowPlayAll && "all".equals(Util.getSongPressAction(context))) {
+			new RecursiveLoader(context) {
+				@Override
+				protected Boolean doInBackground() throws Throwable {
+					getSiblingsRecursively(bookmark);
+
+					if(songs.isEmpty() || !songs.contains(bookmark)) {
+						playNowInTask(Arrays.asList(bookmark), bookmark, bookmark.getBookmark().getPosition());
+					} else {
+						playNowInTask(songs, bookmark, bookmark.getBookmark().getPosition());
+					}
+					return null;
+				}
+
+				@Override
+				protected void done(Boolean result) {
+					context.openNowPlaying();
+				}
+			}.execute();
+		} else {
+			onSongPress(Arrays.asList(bookmark), bookmark, bookmark.getBookmark().getPosition(), false);
+		}
 	}
 
 	private void displayBookmarkInfo(final MusicDirectory.Entry entry) {

@@ -20,7 +20,6 @@ package github.daneren2005.dsub.view;
 
 import android.content.Context;
 import android.graphics.Color;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.*;
@@ -30,6 +29,8 @@ import github.daneren2005.dsub.domain.PodcastEpisode;
 import github.daneren2005.dsub.service.DownloadService;
 import github.daneren2005.dsub.service.DownloadFile;
 import github.daneren2005.dsub.util.DrawableTint;
+import github.daneren2005.dsub.util.SongDBHandler;
+import github.daneren2005.dsub.util.ThemeUtil;
 import github.daneren2005.dsub.util.Util;
 
 import java.io.File;
@@ -50,6 +51,7 @@ public class SongView extends UpdateView2<MusicDirectory.Entry, Boolean> {
 	private TextView statusTextView;
 	private ImageView statusImageView;
 	private ImageView bookmarkButton;
+	private ImageView playedButton;
 	private View bottomRowView;
 
 	private DownloadService downloadService;
@@ -66,8 +68,11 @@ public class SongView extends UpdateView2<MusicDirectory.Entry, Boolean> {
 	private boolean partialFileExists = false;
 	private boolean loaded = false;
 	private boolean isBookmarked = false;
-	private boolean bookmarked = false;
+	private boolean isBookmarkedShown = false;
 	private boolean showPodcast = false;
+	private boolean isPlayed = false;
+	private boolean isPlayedShown = false;
+	private boolean showAlbum = false;
 
 	public SongView(Context context) {
 		super(context);
@@ -84,6 +89,7 @@ public class SongView extends UpdateView2<MusicDirectory.Entry, Boolean> {
 		starButton.setFocusable(false);
 		bookmarkButton = (ImageButton) findViewById(R.id.song_bookmark);
 		bookmarkButton.setFocusable(false);
+		playedButton = (ImageButton) findViewById(R.id.song_played);
 		moreButton = (ImageView) findViewById(R.id.item_more);
 		bottomRowView = findViewById(R.id.song_bottom);
 	}
@@ -110,7 +116,11 @@ public class SongView extends UpdateView2<MusicDirectory.Entry, Boolean> {
 				}
 			}
 			else if(song.getArtist() != null) {
-				artist.append(song.getArtist());
+				if(showAlbum) {
+					artist.append(song.getAlbum());
+				} else {
+					artist.append(song.getArtist());
+				}
 			}
 
 			if(isPodcast) {
@@ -141,6 +151,9 @@ public class SongView extends UpdateView2<MusicDirectory.Entry, Boolean> {
 
 		String title = song.getTitle();
 		Integer track = song.getTrack();
+		if(song.getCustomOrder() != null) {
+			track = song.getCustomOrder();
+		}
 		TextView newPlayingTextView;
 		if(track != null && Util.getDisplayTrack(context)) {
 			trackTextView.setText(String.format("%02d", track));
@@ -209,6 +222,10 @@ public class SongView extends UpdateView2<MusicDirectory.Entry, Boolean> {
 			item.loadMetadata(downloadFile.getCompleteFile());
 			loaded = true;
 		}
+
+		if(item instanceof PodcastEpisode || item.isAudioBook() || item.isPodcast()) {
+			isPlayed = SongDBHandler.getHandler(context).hasBeenCompleted(item);
+		}
 	}
 
 	@Override
@@ -274,18 +291,34 @@ public class SongView extends UpdateView2<MusicDirectory.Entry, Boolean> {
 		}
 
 		if(isBookmarked) {
-			if(!bookmarked) {
+			if(!isBookmarkedShown) {
 				if(bookmarkButton.getDrawable() == null) {
 					bookmarkButton.setImageDrawable(DrawableTint.getTintedDrawable(context, R.drawable.ic_menu_bookmark_selected));
 				}
 
 				bookmarkButton.setVisibility(View.VISIBLE);
-				bookmarked = true;
+				isBookmarkedShown = true;
 			}
 		} else {
-			if(bookmarked) {
+			if(isBookmarkedShown) {
 				bookmarkButton.setVisibility(View.GONE);
-				bookmarked = false;
+				isBookmarkedShown = false;
+			}
+		}
+
+		if(isPlayed) {
+			if(!isPlayedShown) {
+				if(playedButton.getDrawable() == null) {
+					playedButton.setImageDrawable(DrawableTint.getTintedDrawable(context, R.drawable.ic_toggle_played));
+				}
+
+				playedButton.setVisibility(View.VISIBLE);
+				isPlayedShown = true;
+			}
+		} else {
+			if(isPlayedShown) {
+				playedButton.setVisibility(View.GONE);
+				isPlayedShown = false;
 			}
 		}
 
@@ -306,7 +339,15 @@ public class SongView extends UpdateView2<MusicDirectory.Entry, Boolean> {
 			// Still highlight red if a 1-star
 			if(isRated == 1) {
 				this.setBackgroundColor(Color.RED);
-				this.getBackground().setAlpha(20);
+
+				String theme = ThemeUtil.getTheme(context);
+				if("black".equals(theme)) {
+					this.getBackground().setAlpha(80);
+				} else if("dark".equals(theme) || "holo".equals(theme)) {
+					this.getBackground().setAlpha(60);
+				} else {
+					this.getBackground().setAlpha(20);
+				}
 			} else if(rating == 1) {
 				this.setBackgroundColor(0x00000000);
 			}
@@ -321,5 +362,9 @@ public class SongView extends UpdateView2<MusicDirectory.Entry, Boolean> {
 
 	public void setShowPodcast(boolean showPodcast) {
 		this.showPodcast = showPodcast;
+	}
+
+	public void setShowAlbum(boolean showAlbum) {
+		this.showAlbum = showAlbum;
 	}
 }

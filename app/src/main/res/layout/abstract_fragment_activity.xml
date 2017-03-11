@@ -44,7 +44,7 @@
 				android:layout_width="match_parent"
 				android:elevation="4dp"
 				android:visibility="gone"
-				app:theme="?attr/actionbarThemeStyle"
+				android:theme="?attr/actionbarThemeStyle"
 				app:popupTheme="?attr/actionbarPopupStyle"/>
 
 			<LinearLayout
@@ -105,6 +105,13 @@
 
 					<ImageButton
 						style="@style/PlaybackControl.BottomBar"
+						android:id="@+id/download_rewind"
+						android:src="?attr/actionbar_rewind"
+						android:padding="2dp"
+						android:visibility="gone"/>
+
+					<ImageButton
+						style="@style/PlaybackControl.BottomBar"
 						android:id="@+id/download_previous"
 						android:src="?attr/actionbar_backward"
 						android:padding="2dp"/>
@@ -119,11 +126,18 @@
 						android:id="@+id/download_next"
 						android:src="?attr/actionbar_forward"
 						android:padding="2dp"/>
+
+					<ImageButton
+						style="@style/PlaybackControl.BottomBar"
+						android:id="@+id/download_fastforward"
+						android:src="?attr/actionbar_fastforward"
+						android:padding="2dp"
+						android:visibility="gone"/>
 				</LinearLayout>
 			</LinearLayout>
 		</FrameLayout>
 
-		<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+		<FrameLayout
 					android:id="@+id/now_playing_fragment_container"
 					android:layout_width="match_parent"
 					android:layout_height="0dp"

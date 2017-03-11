@@ -3,6 +3,8 @@ package github.daneren2005.dsub.service;
 import android.content.Context;
 import android.util.Log;
 
+import github.daneren2005.dsub.domain.InternetRadioStation;
+import github.daneren2005.dsub.domain.MusicDirectory;
 import github.daneren2005.dsub.domain.PodcastEpisode;
 import github.daneren2005.dsub.util.SilentBackgroundTask;
 import github.daneren2005.dsub.util.SongDBHandler;
@@ -21,18 +23,18 @@ public class Scrobbler {
 	private String lastSubmission;
 	private String lastNowPlaying;
 
-	public void conditionalScrobble(Context context, DownloadFile song, int playerPosition, int duration) {
+	public void conditionalScrobble(Context context, DownloadFile song, int playerPosition, int duration, boolean isPastCutoff) {
 		// More than 4 minutes
 		if(playerPosition > FOUR_MINUTES) {
-			scrobble(context, song, true);
+			scrobble(context, song, true, isPastCutoff);
 		}
 		// More than 50% played
 		else if(duration > 0 && playerPosition > (duration / 2)) {
-			scrobble(context, song, true);
+			scrobble(context, song, true, isPastCutoff);
 		}
 	}
 
-	public void scrobble(final Context context, final DownloadFile song, final boolean submission) {
+	public void scrobble(final Context context, final DownloadFile song, final boolean submission, final boolean isPastCutoff) {
 		if(song == null) {
 			return;
 		}
@@ -55,7 +57,9 @@ public class Scrobbler {
 		new SilentBackgroundTask<Void>(context) {
 			@Override
 			protected Void doInBackground() {
-				SongDBHandler.getHandler(context).setSongPlayed(song, submission);
+				if(isPastCutoff) {
+					SongDBHandler.getHandler(context).setSongPlayed(song, submission);
+				}
 
 				// Scrobbling disabled
 				if (!Util.isScrobblingEnabled(context)) {
@@ -66,7 +70,7 @@ public class Scrobbler {
 					return null;
 				}
 				// Ignore podcasts
-				else if(song.getSong() instanceof PodcastEpisode) {
+				else if(song.getSong() instanceof PodcastEpisode || song.getSong() instanceof InternetRadioStation) {
 					return null;
 				}
 

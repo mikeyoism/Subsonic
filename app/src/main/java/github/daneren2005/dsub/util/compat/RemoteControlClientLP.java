@@ -34,9 +34,11 @@ import android.media.session.PlaybackState;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.support.annotation.NonNull;
 import android.support.v7.media.MediaRouter;
+import android.util.Log;
+import android.view.KeyEvent;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -47,7 +49,6 @@ import github.daneren2005.dsub.domain.Bookmark;
 import github.daneren2005.dsub.domain.MusicDirectory;
 import github.daneren2005.dsub.domain.MusicDirectory.Entry;
 import github.daneren2005.dsub.domain.Playlist;
-import github.daneren2005.dsub.domain.PodcastEpisode;
 import github.daneren2005.dsub.domain.SearchCritera;
 import github.daneren2005.dsub.domain.SearchResult;
 import github.daneren2005.dsub.service.DownloadFile;
@@ -91,7 +92,7 @@ public class RemoteControlClientLP extends RemoteControlClientBase {
 
 		Intent activityIntent = new Intent(context, SubsonicFragmentActivity.class);
 		activityIntent.putExtra(Constants.INTENT_EXTRA_NAME_DOWNLOAD, true);
-		activityIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+		activityIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
 		PendingIntent activityPendingIntent = PendingIntent.getActivity(context, 0, activityIntent, 0);
 		mediaSession.setSessionActivity(activityPendingIntent);
 
@@ -120,8 +121,12 @@ public class RemoteControlClientLP extends RemoteControlClientBase {
 		mediaSession.release();
 	}
 
+	private void setPlaybackState(int state) {
+		setPlaybackState(state, downloadService.getCurrentPlayingIndex(), downloadService.size());
+	}
+
 	@Override
-	public void setPlaybackState(int state) {
+	public void setPlaybackState(int state, int index, int queueSize) {
 		PlaybackState.Builder builder = new PlaybackState.Builder();
 
 		int newState = PlaybackState.STATE_NONE;
@@ -145,11 +150,17 @@ public class RemoteControlClientLP extends RemoteControlClientBase {
 			position = downloadService.getPlayerPosition();
 		}
 		builder.setState(newState, position, 1.0f);
-		builder.setActions(getPlaybackActions());
-
 		DownloadFile downloadFile = downloadService.getCurrentPlaying();
+		Entry entry = null;
+		boolean isSong = true;
 		if(downloadFile != null) {
-			Entry entry = downloadFile.getSong();
+			entry = downloadFile.getSong();
+			isSong = entry.isSong();
+		}
+
+		builder.setActions(getPlaybackActions(isSong, index, queueSize));
+
+		if(entry != null) {
 			addCustomActions(entry, builder);
 			builder.setActiveQueueItemId(entry.getId().hashCode());
 		}
@@ -231,18 +242,21 @@ public class RemoteControlClientLP extends RemoteControlClientBase {
 		return mediaSession;
 	}
 
-	protected long getPlaybackActions() {
+	protected long getPlaybackActions(boolean isSong, int currentIndex, int size) {
 		long actions = PlaybackState.ACTION_PLAY |
 				PlaybackState.ACTION_PAUSE |
 				PlaybackState.ACTION_SEEK_TO |
 				PlaybackState.ACTION_SKIP_TO_QUEUE_ITEM;
 
-		int currentIndex = downloadService.getCurrentPlayingIndex();
-		int size = downloadService.size();
-		if(currentIndex > 0) {
+		if(isSong) {
+			if (currentIndex > 0) {
+				actions |= PlaybackState.ACTION_SKIP_TO_PREVIOUS;
+			}
+			if (currentIndex < size - 1) {
+				actions |= PlaybackState.ACTION_SKIP_TO_NEXT;
+			}
+		} else {
 			actions |= PlaybackState.ACTION_SKIP_TO_PREVIOUS;
-		}
-		if(currentIndex < size - 1) {
 			actions |= PlaybackState.ACTION_SKIP_TO_NEXT;
 		}
 
@@ -311,7 +325,7 @@ public class RemoteControlClientLP extends RemoteControlClientBase {
 
 				return null;
 			}
-			
+
 			private void playFromParent(Entry parent) throws Exception {
 				List<Entry> songs = new ArrayList<>();
 				getSongsRecursively(parent, songs);
@@ -468,6 +482,7 @@ public class RemoteControlClientLP extends RemoteControlClientBase {
 		public void onPlayFromSearch (String query, Bundle extras) {
 			// User just asked to playing something
 			if("".equals(query)) {
+				downloadService.clear();
 				downloadService.setShufflePlayEnabled(true);
 			} else {
 				String mediaFocus = extras.getString(MediaStore.EXTRA_MEDIA_FOCUS);
@@ -488,6 +503,7 @@ public class RemoteControlClientLP extends RemoteControlClientBase {
 					editor.putString(Constants.PREFERENCES_KEY_SHUFFLE_GENRE, genre);
 					editor.commit();
 
+					downloadService.clear();
 					downloadService.setShufflePlayEnabled(true);
 				}
 				else {
@@ -566,6 +582,19 @@ public class RemoteControlClientLP extends RemoteControlClientBase {
 			} else if(CUSTOM_ACTION_STAR.equals(action)) {
 				downloadService.toggleStarred();
 			}
+		}
+
+		@Override
+		public boolean onMediaButtonEvent(@NonNull Intent mediaButtonIntent) {
+			if (getMediaSession() != null && Intent.ACTION_MEDIA_BUTTON.equals(mediaButtonIntent.getAction())) {
+				KeyEvent keyEvent = mediaButtonIntent.getParcelableExtra(Intent.EXTRA_KEY_EVENT);
+				if (keyEvent != null) {
+					downloadService.handleKeyEvent(keyEvent);
+					return true;
+				}
+			}
+
+			return super.onMediaButtonEvent(mediaButtonIntent);
 		}
 	}
 }

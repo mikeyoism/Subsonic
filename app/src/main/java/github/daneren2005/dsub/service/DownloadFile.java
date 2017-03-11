@@ -24,11 +24,14 @@ import java.io.IOException;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
 
 import android.content.Context;
 import android.net.wifi.WifiManager;
 import android.os.PowerManager;
 import android.util.Log;
+
+import github.daneren2005.dsub.domain.InternetRadioStation;
 import github.daneren2005.dsub.domain.MusicDirectory;
 import github.daneren2005.dsub.util.Constants;
 import github.daneren2005.dsub.util.SilentBackgroundTask;
@@ -37,15 +40,6 @@ import github.daneren2005.dsub.util.Util;
 import github.daneren2005.dsub.util.CacheCleaner;
 import github.daneren2005.serverproxy.BufferFile;
 
-import org.apache.http.Header;
-
-import org.apache.http.HttpResponse;
-import org.apache.http.HttpStatus;
-
-/**
- * @author Sindre Mehus
- * @version $Id$
- */
 public class DownloadFile implements BufferFile {
     private static final String TAG = DownloadFile.class.getSimpleName();
     private static final int MAX_FAILURES = 5;
@@ -84,6 +78,9 @@ public class DownloadFile implements BufferFile {
     public MusicDirectory.Entry getSong() {
         return song;
     }
+	public boolean isSong() {
+		return song.isSong();
+	}
 
 	public Context getContext() {
 		return context;
@@ -111,7 +108,7 @@ public class DownloadFile implements BufferFile {
 			}
 		} else if(song.getSuffix() != null && (song.getTranscodedSuffix() == null || song.getSuffix().equals(song.getTranscodedSuffix()))) {
 			// If just downsampling, don't try to upsample (ie: 128 kpbs -> 192 kpbs)
-			if(song.getBitRate() != null && br > song.getBitRate()) {
+			if(song.getBitRate() != null && (br == 0 || br > song.getBitRate())) {
 				br = song.getBitRate();
 			}
 		}
@@ -374,6 +371,18 @@ public class DownloadFile implements BufferFile {
 		}
 	}
 
+	public boolean isStream() {
+		return song != null && song instanceof InternetRadioStation;
+	}
+	public String getStream() {
+		if(song != null && song instanceof InternetRadioStation) {
+			InternetRadioStation station = (InternetRadioStation) song;
+			return station.getStreamUrl();
+		} else {
+			return null;
+		}
+	}
+
     @Override
     public String toString() {
         return "DownloadFile (" + song + ")";
@@ -450,17 +459,15 @@ public class DownloadFile implements BufferFile {
 				}
 				if(compare) {
 					// Attempt partial HTTP GET, appending to the file if it exists.
-					HttpResponse response = musicService.getDownloadInputStream(context, song, partialFile.length(), bitRate, DownloadTask.this);
-					Header contentLengthHeader = response.getFirstHeader("Content-Length");
-					if(contentLengthHeader != null) {
-						String contentLengthString = contentLengthHeader.getValue();
-						if(contentLengthString != null) {
-							Log.i(TAG, "Content Length: " + contentLengthString);
-							contentLength = Long.parseLong(contentLengthString);
-						}
+					HttpURLConnection connection = musicService.getDownloadInputStream(context, song, partialFile.length(), bitRate, DownloadTask.this);
+					long contentLength = connection.getContentLength();
+					if(contentLength > 0) {
+						Log.i(TAG, "Content Length: " + contentLength);
+						DownloadFile.this.contentLength = contentLength;
 					}
-					in = response.getEntity().getContent();
-					boolean partial = response.getStatusLine().getStatusCode() == HttpStatus.SC_PARTIAL_CONTENT;
+
+					in = connection.getInputStream();
+					boolean partial = connection.getResponseCode() == HttpURLConnection.HTTP_PARTIAL;
 					if (partial) {
 						Log.i(TAG, "Executed partial HTTP GET, skipping " + partialFile.length() + " bytes");
 					}
@@ -529,8 +536,9 @@ public class DownloadFile implements BufferFile {
 			}
 			
 			// Only run these if not interrupted, ie: cancelled
-			if(!isCancelled()) {
-				new CacheCleaner(context, DownloadService.getInstance()).cleanSpace();
+			DownloadService downloadService = DownloadService.getInstance();
+			if(downloadService != null && !isCancelled()) {
+				new CacheCleaner(context, downloadService).cleanSpace();
 				checkDownloads();
 			}
 

@@ -157,16 +157,11 @@ public class DLNAController extends RemoteController {
 			protected void eventReceived(GENASubscription genaSubscription) {
 				Map<String, StateVariableValue> m = genaSubscription.getCurrentValues();
 				try {
-<<<<<<< HEAD
-					String lastChangeTmp = m.get("LastChange").toString();
-					lastChangeTmp = lastChangeTmp.replace(",X_DLNA_SeekTime","");
-					LastChange lastChange = new LastChange(new AVTransportLastChangeParser(), lastChangeTmp);
-=======
+
 					String lastChangeText = m.get("LastChange").toString();
 					lastChangeText = lastChangeText.replace(",X_DLNA_SeekTime","").replace(",X_DLNA_SeekByte", "");
 					LastChange lastChange = new LastChange(new AVTransportLastChangeParser(), lastChangeText);
 
->>>>>>> origin/master
 					if (lastChange.getEventedValue(0, AVTransportVariable.TransportState.class) == null) {
 						return;
 					}
